@@ -3,9 +3,13 @@
 **不是库手册，是攻防回合。** 每一章先让错误姿势失败一次，再给正确姿势 ——
 只讲正确姿势的教程，读者记不住为什么。
 
-配套靶场：[`crawler-dojo`](../crawler-dojo)（守）。那边提供六级递增的防护，
-这边逐级应对。真实站点的收官案例用的是本项目的博客 `blog.djdj45.top`，
-**它自己就带着反爬**，所以那一段是真实战场，不是模拟。
+配套靶场：[**crawler-dojo**](https://github.com/djdj45-SSH/crawler-dojo)（守）。
+那边提供六级递增的防护，这边逐级应对。真实站点的收官案例用的是本项目的博客
+[blog.djdj45.top](https://blog.djdj45.top)，**它自己就带着反爬**，
+所以那一段是真实战场，不是模拟。
+
+> 不加 shields.io 徽章是有意的：那个服务在国内经常加载不出来，会显示成裂图。
+> 纯文本链接在任何网络下都能用。
 
 ---
 
@@ -143,10 +147,25 @@ crawler-labs/
 │   ├── base.py            Lab / Outcome；require() 与 ensure_level()
 │   ├── lab01..lab11       十一个实验，顺序即章节顺序
 │   └── __init__.py        清单（显式列出，不用魔法扫描）
-├── storage/               SQLAlchemy 模型 + 幂等 upsert
+├── scrapy_dojo/           第 8 章：一个完整的 Scrapy 工程
+│   ├── dojo_spider/       settings / items / middlewares / pipelines / spiders
+│   └── README.md          含五个"跑了才知道"的框架行为
+├── storage/               SQLAlchemy 模型 + 幂等 upsert（实验 11 与 Scrapy 共用）
 ├── fixtures/              契约缓存、HTML 快照（解析层离线测试用）
-└── docs/chapters.md       章节编排
+└── docs/
+    ├── chapters.md        章节编排 + 还没做的事
+    ├── chapter-11.md      第 11 章：写防护，给自己的站起步
+    └── appendices.md      附录 A/B/C：请求库、解析库、存储方案对比
 ```
+
+### 第 8 章：Scrapy 工程
+
+前面 11 个实验都是"一个脚本解决一个问题"。第 8 章换成框架，回答两个新问题：
+前面的结论还成立吗（成立），以及**框架帮你做了什么、又瞒着你什么**。
+
+后者的答案值得单独去读 —— 比如 Scrapy 2.19 里
+**`start_requests()` 已经完全不被调用**（网上教程还在教它），
+而且失效时**不报任何错**。见 [`scrapy_dojo/README.md`](scrapy_dojo/README.md)。
 
 ---
 

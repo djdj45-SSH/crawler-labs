@@ -71,17 +71,26 @@ python -m server.main --level all
 
 ---
 
-## 还没做的事（下一步）
+## 已经补齐的
+
+- **第 8 章 Scrapy 工程** —— `scrapy_dojo/` 已建好并实测通过：
+  两个 spider（`articles` 真数据 / `honeypot` 假数据）、
+  四个管道（校验 / 去重 / 落库 / 报告）、一个中间件（契约信号 + Retry-After）。
+  顺带记下五个"跑了才知道"的框架行为，见该目录的 README。
+- **第 11 章「写防护」** —— 见 [`chapter-11.md`](chapter-11.md)。
+  从"先回答三个问题"到"什么时候该停手"，配一份反面清单。
+- **附录 A / B / C** —— 见 [`appendices.md`](appendices.md)：
+  请求库对比、解析库对比、存储方案对比。
+
+## 还没做的
 
 诚实地列在这里，免得以为是漏了：
 
-- **第 8 章的 Scrapy 工程** —— 只写了签名实验（10），`scrapy_dojo/` 项目还没建。
-  那是一个完整的 Scrapy 工程（spider / items / pipelines / middlewares），
-  文件数不少，值得单独一次做完。
-- **第 11 章的「写防护」** —— 素材在 `crawler-dojo/cloudflare/README.md`
-  和博客仓库的 `tools/traps.rules.md`，但还没写成独立的一章。
-- **附录 A / B** —— 库对比表还没写。现在只在实验室里零散提到。
-- **HTML 快照（`fixtures/`）** —— 目录和说明建好了，但实验 03 目前是直接抓靶场，
-  还没切到"抓一次存快照、之后离线解析"的流程。这一步做完，第 3 章就能完全脱靶场跑。
-- **PostgreSQL 路径** —— `storage/models.py` 里 ORM 已经写好，换个连接串就能用，
+- **HTML 快照（`fixtures/`）** —— 目录和说明建好了，但实验 03 还是直接抓靶场。
+  计划是"抓一次存快照，之后解析层只读快照"，这样第 3 章能完全脱靶场跑。
+- **第 10 章的游戏站案例** —— `blockwild-game` 是最典型的"数据藏在 JS 深处"
+  （15 个 `<script>`，数据在 `src/sim/*.js`），比靶场的 L4 更硬。
+  它是"必须上浏览器"的对照案例，还没写成实验。
+- **PostgreSQL 路径** —— `storage/models.py` 的 ORM 已经写好，换个连接串就能用，
   但实验只测了 SQLite。
+- **蜜罐接进博客** —— 一条重定向规则的改动，一直排在最后。
