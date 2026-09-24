@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# 抓取产物：这些都是可以重新生成的，不该进仓库
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.csv
+*.jsonl
+fixtures/*.html
+fixtures/*.json
+
+# 密钥
+.env
+.env.local
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+.DS_Store
