@@ -15,6 +15,14 @@ Scrapy 2.13 起入口换成了异步的 `start()`。**2.19 里 `start_requests()
 
 网上绝大多数教程还在教 `start_requests`。这一条只有跑起来才会发现 ——
 正好是本项目想反复强调的那件事：**框架的行为要查源码和实跑，不能凭印象。**
+
+离线也能跑
+----------
+    scrapy crawl articles -s DOJO_SNAPSHOT=auto
+
+用白名单身份取内容层，而内容层不随防护等级变（白名单跳过全部守卫），
+所以随便哪一份快照都行 —— 这里声明 `l0`，因为它最"素"。
+契约也从快照的 manifest 拿，不是从本地缓存 —— 理由见 `snapshot.py` 的 `load_contract`。
 """
 
 from __future__ import annotations
@@ -24,8 +32,9 @@ import os
 
 import scrapy
 
-from dojo import Dojo, fetch_contract
+from dojo import Dojo
 from scrapy_dojo.dojo_spider.items import ArticleItem
+from scrapy_dojo.dojo_spider.snapshot import load_contract
 
 FIELDS = ("slug", "title", "published_at", "tags", "word_count", "summary", "body")
 
@@ -33,14 +42,20 @@ FIELDS = ("slug", "title", "published_at", "tags", "word_count", "summary", "bod
 class ArticlesSpider(scrapy.Spider):
     name = "articles"
 
+    #: 离线模式下用哪一份快照（`-s DOJO_SNAPSHOT=auto` 时读它）。
+    snapshot_tag = "l0"
+
     def __init__(self, base_url: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.base_url = base_url or os.environ.get("DOJO_BASE_URL", "http://127.0.0.1:8000")
-        self.contract = fetch_contract(self.base_url)
+
+    async def start(self):
+        # 契约要在这里取，不能放在 __init__：`-s` 传进来的设置只有在 spider
+        # 被 Crawler 接上之后才读得到（__init__ 里 self.settings 还不存在）。
+        self.contract = load_contract(self, self.base_url)
         self.dojo = Dojo(self.base_url, self.contract)
         self.start_url = self.dojo.url(self.dojo.endpoints["list_json"])
 
-    async def start(self):
         active = self.contract.active_levels or ["L0"]
         self.logger.info(
             "契约来源=%s，生效等级=%s，端点=%s",

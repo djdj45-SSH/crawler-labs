@@ -172,6 +172,31 @@ def ext_for(content_type: str, path: str) -> str:
     return tail.rsplit(".", 1)[-1] if "." in tail else "bin"
 
 
+#: 这些头描述的是**传输过程**，而存下来的字节是 requests 已经解压过的。
+#: 原样记下来会让读取方去解压一段本来就没压缩的内容 —— 尤其是 Scrapy 的
+#: `HttpCompressionMiddleware`，它会照着 `Content-Encoding: gzip` 去 gunzip
+#: 一段纯文本，然后报一个和"快照坏了"看起来毫不相干的解码错误。
+_TRANSPORT_HEADERS = frozenset(
+    {"content-encoding", "transfer-encoding", "connection", "keep-alive"}
+)
+
+
+def recordable_headers(raw, body: bytes) -> dict[str, str]:
+    """落盘用的响应头。
+
+    `content-length` 重新按**存下来的字节数**算：原值指的是压缩后的大小，
+    留着它就是在断言一个不成立的事实。其余原样保留 —— 契约信号头
+    （`X-Dojo-*`）和 `date`（能看出这份快照多老）都是有用的观察结果。
+    """
+    out = {
+        k.lower(): v
+        for k, v in raw.items()
+        if k.lower() not in _TRANSPORT_HEADERS
+    }
+    out["content-length"] = str(len(body))
+    return out
+
+
 def auto_delay(contract) -> float:
     """L2 生效时，抓取动作本身会被限流 —— 按契约算一个安全间隔。
 
@@ -302,7 +327,7 @@ def capture_run(base_url: str, tag: str, *, force: bool, level_note: str) -> Sna
             sha256=hashlib.sha256(r.content).hexdigest(),
             encoding=r.encoding,
             apparent_encoding=r.apparent_encoding,
-            headers={k.lower(): v for k, v in r.headers.items()},
+            headers=recordable_headers(r.headers, r.content),
         )
         pages.append(entry)
 

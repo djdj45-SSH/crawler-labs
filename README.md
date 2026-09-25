@@ -65,6 +65,10 @@ python main.py --snapshot auto    # 每个实验各用自己那一级
 第 1、2、3、4、6、7、9 章完全脱靶场；剩下 4 项（限流、渲染耗时、签名验证、真实站点）
 原理上就替代不了，它们会明确说出来。详见 [`fixtures/README.md`](fixtures/README.md)。
 
+```bash
+cd scrapy_dojo && scrapy crawl articles -s DOJO_SNAPSHOT=auto   # 第 8 章读的是同一批快照
+```
+
 > 一个意外的好处：**离线比在线能多跑通两项。**
 > 靶场是"防护叠加"的 —— `--level all` 下裸 UA 在 L1 就停下，第 6、7 章永远收不到
 > 那个请求，只能跳过（所以在线 `--level all` 是 6 通过 / 5 跳过）。
@@ -193,8 +197,8 @@ crawler-labs/
 │   ├── lab01..lab11       十一个实验，顺序即章节顺序
 │   └── __init__.py        清单（显式列出，不用魔法扫描）
 ├── scrapy_dojo/           第 8 章：一个完整的 Scrapy 工程
-│   ├── dojo_spider/       settings / items / middlewares / pipelines / spiders
-│   └── README.md          含五个"跑了才知道"的框架行为
+│   ├── dojo_spider/       settings / items / middlewares / snapshot / pipelines / spiders
+│   └── README.md          含五个"跑了才知道"的框架行为 + 离线模式
 ├── storage/               SQLAlchemy 模型 + 幂等 upsert（实验 11 与 Scrapy 共用）
 ├── fixtures/              契约缓存；snapshots/<tag>/ 是抓下来的 HTML 快照
 └── docs/
@@ -210,6 +214,11 @@ crawler-labs/
 
 只有真正离不开实时响应的实验才直接用 `requests`，并把 `live_only` 打开、写清理由
 （第 5、8、10 章和实验 08）。离线模式下它们会跳过并打印那句理由，不是静默消失。
+
+第 8 章的 Scrapy 工程里是同一条规则的另一种写法：**一个下载器中间件**
+（`dojo_spider/snapshot.py`）在 `process_request` 里直接返回冻结的响应。
+spider、items、9 个管道一行都没改 —— 这恰好说明"取页面走同一个入口"
+不是脚本级的取巧，而是这个做法本身的性质。
 
 ### 第 8 章：Scrapy 工程
 

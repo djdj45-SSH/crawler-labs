@@ -36,6 +36,68 @@ scrapy crawl honeypot          # 故意接假数据（需要 L3，见下）
 
 ---
 
+## 也可以不起靶场：离线模式
+
+跟手工实验（`lab01–11`）用的是**同一份快照**：
+
+```bash
+cd ..                      # 回到 crawler-labs 根目录
+python snapshot.py --all   # 六个等级各抓一份（约 1 分钟）
+
+cd scrapy_dojo
+scrapy crawl articles -s DOJO_SNAPSHOT=auto
+scrapy crawl honeypot -s DOJO_SNAPSHOT=auto
+```
+
+`auto` 表示"用 spider 自己声明的 `snapshot_tag`"：`articles` → `l0`，
+`honeypot` → `l3`。也可以写死一个标签（`-s DOJO_SNAPSHOT=l3`），
+不传就是走网络，和以前完全一样。
+
+实测（确认没有服务在跑）：
+
+```
+契约来源=snapshot:l0，生效等级=L0，端点=/api/articles
+  通过校验     6 条
+  入库         新增 6 · 更新 0        ← 第二遍 新增 0 · 更新 6
+
+honeypot: 拿到 8 条记录 · 校验拦下 8 条 · 入库 新增 0
+```
+
+### 为什么这件事本身就是一个结论
+
+**"离线快照"不是某个脚本的取巧，它是"把响应当成数据"这个做法 —— 和用什么框架无关。**
+
+换到 Scrapy 里，实现它只需要**一个中间件**：在 `process_request` 里直接返回一个
+冻结的响应，跳过真正的下载。spider、items、管道、校验逻辑**一行都不用改**，
+9 个管道的输出和联机时逐字相同。
+
+而且它证明了这个设计是**正交**的：`DojoSignalsMiddleware`（排在 585）在离线模式下
+照样读到快照里冻结的 `X-Dojo-*` 响应头，于是那句
+「数据来自 L3 的 honeypot 响应，不是真实内容」的 WARNING 原样出现。
+观测逻辑不用为离线模式写第二套 —— 和 `main.py --snapshot` 那边是同一条道理。
+
+### 三个坑（都写在 `dojo_spider/snapshot.py` 里了）
+
+**① 中间件队列位置是 540，不是随便挑的。**
+身份靠 UA 反推，而 `UserAgentMiddleware` 排在 **500** —— 排在它前面只能读到空 UA，
+于是**所有请求都被当成裸身份**。现象是"白名单也拿不到真数据"，而你不会想到
+去查中间件顺序。默认队列（打印 `DOWNLOADER_MIDDLEWARES_BASE` 得到）：
+`offsite 50 · robotstxt 100 · httpauth 300 · timeout 350 · defaultheaders 400 ·
+useragent 500 · retry 550 · metarefresh 580 · compression 590 · redirect 600`。
+
+**② `RetryMiddleware` 照样会看到快照响应。**
+`process_response` 是全局倒序跑的，与"谁产生的响应"无关。所以 L2 那一级的 429 快照
+会被重试三次（拿到同一份字节）。修法是 `request.meta["dont_retry"] = True` ——
+冻结的答案重试一百次也一样，这一条是**结论**，不是优化。
+
+**③ 快照里不能保留 `Content-Encoding`。**
+存下来的字节是 `requests` 已经解压过的，把 `Content-Encoding: gzip` 一起冻进去，
+`HttpCompressionMiddleware` 会去 gunzip 一段纯文本，报一个看起来和"快照坏了"
+毫不相干的解码错误。抓取侧现在不记这些头了（顺手把 `Content-Length` 按实际
+字节数重算），中间件里再挡一道，兼容改动之前抓的旧快照。
+
+---
+
 ## 两个 spider 的差别
 
 | | `articles` | `honeypot` |
@@ -98,15 +160,18 @@ scrapy_dojo/
     ├── settings.py        每行都是针对本项目的选择
     ├── items.py           ArticleItem（含 source 字段，记来源）
     ├── middlewares.py     契约信号 → stats；兑现 Retry-After
+    ├── snapshot.py        离线模式：一个中间件让整个工程能对着快照跑
     ├── pipelines.py       校验 / 去重 / 落库 / 报告
     └── spiders/
         ├── articles.py    真数据
         └── honeypot.py    假数据
 ```
 
-**为什么复用父目录的 `dojo.py` 和 `storage/models.py`，而不是各写一份：**
+**为什么复用父目录的 `dojo.py`、`snapshots.py` 和 `storage/models.py`，而不是各写一份：**
 "契约驱动"和"幂等写入"是这个项目的两条主结论。另写一套会让读者以为
 那是两回事 —— 它们本来是一回事，只是换了个执行框架。
+离线快照同理：手工实验和 Scrapy 读的是**同一份** `fixtures/snapshots/`，
+连"身份怎么判"都共用 `dojo.py` 里那条规则。
 
 ---
 
@@ -147,9 +212,10 @@ Scrapy 2.19 对每个接收 `spider` 参数的管道/中间件方法都会给弃
 
 | 结论 | 在 Scrapy 里落在哪 |
 |---|---|
-| **契约驱动** | spider 的 `__init__` 拉 `/__dojo/contract`，端点和身份都从契约取 |
+| **契约驱动** | spider 的 `start()` 拉 `/__dojo/contract`（离线时从快照的 manifest 拿），端点和身份都从契约取 |
 | **幂等写入** | `SqlitePipeline` 复用实验 11 的 `upsert`，实测第二次跑 `新增 0 · 更新 6` |
 | **数据校验** | `ValidationPipeline`（时间范围 / 字段自洽 / 必填），蜜罐 8 条全被拦下 |
+| **可复现** | 一个中间件接上同一份快照，9 个管道输出逐字不变（见上面的「离线模式」） |
 
 ---
 

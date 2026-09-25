@@ -82,11 +82,28 @@ CONCURRENT_REQUESTS_PER_DOMAIN = 4
 COOKIES_ENABLED = False
 TELNETCONSOLE_ENABLED = False
 
+# ---------------------------------------------------------------------------
+# 离线模式
+#
+# 空 = 走网络，和以前完全一样。
+#   -s DOJO_SNAPSHOT=l0      指定一份快照
+#   -s DOJO_SNAPSHOT=auto    用 spider 自己声明的 snapshot_tag
+#
+# 打开之后，spider / 管道 / 校验逻辑一行都不用改 —— 只有一个中间件在
+# process_request 里直接返回冻结的响应。实现见 snapshot.py。
+# ---------------------------------------------------------------------------
+DOJO_SNAPSHOT = ""
+
 # 契约信号头要能读到，别被中间件顺序吃掉
 DOWNLOADER_MIDDLEWARES = {
-    # 我们的中间件排在默认 RetryMiddleware（550）之后。
+    # 540：必须在 UserAgentMiddleware（500）**之后** ——
+    # 这个中间件要靠 UA 判断身份，排在前面就只能读到空 UA，
+    # 于是所有请求都被当成裸身份（现象是"白名单也拿不到真数据"）。
+    "dojo_spider.snapshot.SnapshotMiddleware": 540,
+    # 585：我们的信号中间件排在默认 RetryMiddleware（550）之后。
     # Scrapy 的 process_response 按数字**从大到小**调用，所以 585 先看到响应 ——
     # 这样我们才能在重试发生之前先把 Retry-After 的延迟设好。
+    # （离线模式下它一样生效：快照里冻结的 X-Dojo-* 头照样会被读到。）
     "dojo_spider.middlewares.DojoSignalsMiddleware": 585,
 }
 

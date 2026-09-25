@@ -13,8 +13,13 @@
     cd ../crawler-dojo && python -m server.main --level L3
     scrapy crawl honeypot
 
+离线也行（不需要靶场）：
+
+    scrapy crawl honeypot -s DOJO_SNAPSHOT=auto
+
 注意它故意用**裸 User-Agent**：蜜罐只喂给未声明身份的客户端。
 用白名单身份请求会拿到真数据 —— 那样就看不到这一课了。
+中间件按 UA 反推身份，所以裸 UA + `l3` 快照 = 拿到那份冻下来的假数据。
 
 入口方法同样用 `async def start()`，理由见 articles.py 的说明。
 """
@@ -26,8 +31,9 @@ import os
 
 import scrapy
 
-from dojo import Dojo, fetch_contract
+from dojo import Dojo
 from scrapy_dojo.dojo_spider.items import ArticleItem
+from scrapy_dojo.dojo_spider.snapshot import load_contract
 
 FIELDS = ("slug", "title", "published_at", "tags", "word_count", "summary", "body")
 
@@ -46,18 +52,23 @@ BARE_UA = "python-requests/2.31.0"
 class HoneypotSpider(scrapy.Spider):
     name = "honeypot"
 
+    #: 离线模式下用哪一份快照。蜜罐只存在于 L3，所以这里必须是 l3。
+    snapshot_tag = "l3"
+
     def __init__(self, base_url: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.base_url = base_url or os.environ.get("DOJO_BASE_URL", "http://127.0.0.1:8000")
-        self.contract = fetch_contract(self.base_url)
+
+    async def start(self):
+        self.contract = load_contract(self, self.base_url)
         self.dojo = Dojo(self.base_url, self.contract)
         self.start_url = self.dojo.url(self.dojo.endpoints["list_json"])
 
-    async def start(self):
         if "L3" not in self.contract.active_levels:
             self.logger.error(
                 "这一章需要 L3 生效，当前生效等级是 %s。\n"
-                "  单独开启：cd ../crawler-dojo && python -m server.main --level L3",
+                "  联机：cd ../crawler-dojo && python -m server.main --level L3\n"
+                "  离线：scrapy crawl honeypot -s DOJO_SNAPSHOT=auto（用 l3 那份快照）",
                 ", ".join(self.contract.active_levels) or "L0",
             )
             return

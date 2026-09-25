@@ -25,6 +25,23 @@ python main.py --snapshot l3      # 离线跑：全部对着 l3 那一份
 抓完之后，第 2、3、6、7、9 章**不用靶场也能跑** ——
 `python main.py --snapshot auto` 在没有任何服务在跑的情况下能过 7 项。
 
+### 同一份快照，两个消费者
+
+快照不是"手工实验专用的脚手架"。第 8 章的 Scrapy 工程读的是**同一批文件**：
+
+```bash
+scrapy crawl articles -s DOJO_SNAPSHOT=auto    # → 用 l0
+scrapy crawl honeypot -s DOJO_SNAPSHOT=auto    # → 用 l3（spider 自己声明）
+```
+
+那边不需要改 spider、改管道 —— 只要一个下载器中间件在 `process_request` 里
+直接返回冻结的响应（见 `scrapy_dojo/dojo_spider/snapshot.py`），
+甚至连"身份怎么判"都共用 `dojo.py` 里那条规则。
+
+**这件事本身就是一条结论：离线快照不是某个脚本的取巧，它是"把响应当成数据"
+这个做法，和用什么框架无关。** 所以改这份 README 里的任何约定之前，
+记得两个消费者都要看一遍 —— 加一个字段、改一个索引键，两边都会受影响。
+
 > **顺带解决了一个老大难。** 靶场是"防护叠加"的：`--level all` 下裸 UA 在 L1 就停下，
 > 第 6、7 章永远收不到那个请求，只能跳过。所以在线跑 `--level all` 是 6 通过 / 5 跳过，
 > 而离线 `--snapshot auto` 是 **7 通过 / 4 跳过** —— 反而更多。

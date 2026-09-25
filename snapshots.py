@@ -37,6 +37,21 @@
 ------------
 见 `fixtures/README.md`。一句话：它们能从公开的靶场重新抓，而一旦提交就可能
 悄悄过期 —— 解析实验却对着过期页面报"通过"，比失败更糟。
+
+两个消费者
+----------
+这些文件不只服务手工实验。第 8 章的 Scrapy 工程读的是**同一批**：
+
+    python main.py --snapshot auto                 # lab01–11
+    scrapy crawl articles -s DOJO_SNAPSHOT=auto    # scrapy_dojo/
+
+所以改这里要两边一起想。有两样东西是"契约"：
+
+  · `(路径, 身份)` 这个索引键 —— 两边都按它取页
+  · manifest 里冻结的契约 —— 两边都拿它当"当前生效等级"的依据
+
+注意身份名单**不在这里**，在 `dojo.py` 的 `IDENTITIES`。
+本模块只按 `(路径, 身份)` 索引，不负责定义身份 —— 抄一份过来就会漂移。
 """
 
 from __future__ import annotations
@@ -49,9 +64,6 @@ from typing import Any
 
 ROOT = pathlib.Path(__file__).resolve().parent
 SNAPSHOT_DIR = ROOT / "fixtures" / "snapshots"
-
-#: 快照支持的身份。抓取侧（snapshot.py）与读取侧共用这份定义。
-IDENTITIES = ("bare", "browser", "whitelist")
 
 
 class SnapshotMiss(RuntimeError):
@@ -142,7 +154,12 @@ class SnapshotResponse:
 
     @property
     def text(self) -> str:
-        for enc in (self.encoding, "utf-8"):
+        """按 requests 的规则解码：`encoding or apparent_encoding`。
+
+        顺序和 `requests.Response.text` 一致 —— 差一个字符，快照读出来的正文
+        就可能和当时抓的不一样，而那种差异极难发现（只在某些响应上出现）。
+        """
+        for enc in (self.encoding, self.apparent_encoding, "utf-8"):
             if not enc:
                 continue
             try:
