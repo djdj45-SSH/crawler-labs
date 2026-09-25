@@ -23,6 +23,12 @@ HTML（其实是 trap 页），正则匹配不到 <loc>。状态码是 200，所
 再用白名单身份去拿真正的清单。这比"直接用白名单跑通"多教一课。
 
 依赖：需要能访问 blog.djdj45.top。不通时本实验跳过。
+
+为什么离线跑不了
+----------------
+它抓的是**别人的站**（本项目作者的博客），而且整个教学点就是"真实站点不给你信号头，
+只能从状态码和落点推断"。快照能做的是"复现靶场的某一级"，做不了"复现互联网"——
+把别人的页面存进自己的仓库，既不合适，也失去了"这是活的"这层意义。
 """
 
 from __future__ import annotations
@@ -50,6 +56,12 @@ class BlogCapstone(Lab):
     teaches = "真实站点不会告诉你被识别了 —— 只有一个 200 和一份警告页"
     needs = []
     chapter = "10"
+
+    live_only = True
+    live_only_reason = (
+        "这一章要的是**真实站点**（blog.djdj45.top），不是被冻结的靶场响应。"
+        "需要能联外网。"
+    )
 
     def run(self, ctx: LabContext) -> Outcome:
         sitemap = f"{BLOG}/sitemap.xml"

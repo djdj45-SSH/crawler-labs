@@ -51,6 +51,45 @@ class ContractError(RuntimeError):
     pass
 
 
+class IdentityError(ValueError):
+    pass
+
+
+# ---------------------------------------------------------------------------
+# 三种身份
+#
+# 这个项目里，"我是谁"才是自变量 —— 同一路径、同一时刻，换一个身份就换一份响应：
+#
+#   bare       没有 UA。requests 会填上自己的默认值（python-requests/2.x），
+#              等于敲门时自报家门 —— 靶场的 L1 就是冲它来的。
+#   browser    伪装成浏览器。能过 L1 的黑名单（它不在名单里），
+#              **但拿不到白名单标记** —— 这就是第 4 章要讲的全部。
+#   whitelist  声明身份 + 留联系方式。契约里写明了它会跳过 L1–L5 全部防护。
+#
+# 放在这里而不是散在各个实验里，是因为快照的主键是 (路径, 身份) ——
+# 抓取侧和读取侧必须用**同一套定义**，否则快照和实验室会对不上。
+# ---------------------------------------------------------------------------
+
+BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/122.0 Safari/537.36"
+)
+
+IDENTITIES = ("bare", "browser", "whitelist")
+
+
+def headers_for(identity: str, contract: "Contract") -> dict[str, str]:
+    if identity == "bare":
+        return {}
+    if identity == "browser":
+        return {"User-Agent": BROWSER_UA}
+    if identity == "whitelist":
+        return {"User-Agent": contract.whitelist_ua}
+    raise IdentityError(
+        f"未知身份 {identity!r}；可选：{'、'.join(IDENTITIES)}"
+    )
+
+
 @dataclass
 class Level:
     id: str
@@ -165,14 +204,21 @@ class Dojo:
 
     # ---- 身份 ----
 
+    def headers(self, identity: str) -> dict[str, str]:
+        return headers_for(identity, self.contract)
+
     @property
     def bare_headers(self) -> dict[str, str]:
         """未声明身份的客户端。故意留空 UA —— requests 会填上自己的默认值。"""
-        return {}
+        return headers_for("bare", self.contract)
+
+    @property
+    def browser_headers(self) -> dict[str, str]:
+        return headers_for("browser", self.contract)
 
     @property
     def whitelist_headers(self) -> dict[str, str]:
-        return {"User-Agent": self.contract.whitelist_ua}
+        return headers_for("whitelist", self.contract)
 
     # ---- 契约信号（这三个头是契约里声明的，不是实现细节）----
 

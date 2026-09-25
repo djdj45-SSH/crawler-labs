@@ -11,7 +11,7 @@
 
 from __future__ import annotations
 
-from .base import Lab, LabContext, Outcome
+from .base import FALLBACK_LEVEL, Lab, LabContext, LabSkip, Outcome
 
 from .lab01_http_basics import HttpBasics
 from .lab02_requests_l0 import RequestsL0
@@ -56,4 +56,13 @@ def find_lab(token: str) -> Lab | None:
     return None
 
 
-__all__ = ["LAB_CLASSES", "Lab", "LabContext", "Outcome", "all_labs", "find_lab"]
+__all__ = [
+    "FALLBACK_LEVEL",
+    "LAB_CLASSES",
+    "Lab",
+    "LabContext",
+    "LabSkip",
+    "Outcome",
+    "all_labs",
+    "find_lab",
+]

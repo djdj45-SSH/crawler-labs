@@ -7,11 +7,12 @@
 本实验用白名单 UA，因为契约端点本来就不拦人（它是自证性的前提）。
 这不是取巧 —— 真实世界里，一个有礼貌的爬虫第一次运行时就该带着联系方式。
 第 4 章我们才会故意把身份摘掉，看看会发生什么。
+
+离线也能跑：编码那两个值（`r.encoding` / `r.apparent_encoding`）是**抓取时的观察结果**，
+已经记进快照的 manifest —— 因为这一章讲的正是"r.text 为什么会乱码"，不记就没法复现。
 """
 
 from __future__ import annotations
-
-import requests
 
 from .base import Lab, LabContext, Outcome
 
@@ -26,11 +27,12 @@ class HttpBasics(Lab):
 
     def run(self, ctx: LabContext) -> Outcome:
         url = ctx.dojo.url(ctx.dojo.endpoints["contract"])
-        r = requests.get(url, headers=ctx.dojo.whitelist_headers, timeout=5)
+        r = ctx.fetch(url, identity="whitelist")
 
         ctype = r.headers.get("content-type", "")
         lines = [
             f"URL          {url}",
+            f"来源          {ctx.source_label}",
             f"状态码        {r.status_code}",
             f"Content-Type {ctype}",
             f"r.encoding   {r.encoding}       ← 来自响应头，可能不准",
@@ -64,6 +66,7 @@ class HttpBasics(Lab):
             Outcome.pass_(
                 f"200 · {ctype.split(';')[0]} · {len(r.content)} 字节",
                 self.level,
+                detail="\n".join(lines),
                 status=r.status_code,
                 encoding=r.encoding,
                 apparent=r.apparent_encoding,

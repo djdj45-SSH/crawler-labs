@@ -17,15 +17,15 @@
   声明 = 从"对抗关系"进入"被接纳状态"，后续规则可以主动放行你
 
 真实站点会继续加维度（频率、指纹、行为），伪装的路是走不到头的。
+
+这个实验正好是"快照最有用"的一类：三种身份的响应**必须同时看到**才能讲清那一课。
+实时跑要在一个瞬间打三次；离线跑就是读三个文件，对照着看更清楚。
+身份常量定义在 dojo.py（抓取侧和读取侧共用同一套）。
 """
 
 from __future__ import annotations
 
-import requests
-
 from .base import Lab, LabContext, Outcome
-
-BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36"
 
 
 class UaWhitelist(Lab):
@@ -48,14 +48,15 @@ class UaWhitelist(Lab):
         url = ctx.dojo.url(ctx.dojo.endpoints["list_json"])
 
         # ① 错误姿势：默认身份
-        bad = requests.get(url, timeout=5)
+        bad = ctx.fetch(url, identity="bare")
         # ② 伪装：装成浏览器
-        faked = requests.get(url, headers={"User-Agent": BROWSER_UA}, timeout=5)
+        faked = ctx.fetch(url, identity="browser")
         # ③ 正确姿势：声明身份
-        good = requests.get(url, headers=ctx.dojo.whitelist_headers, timeout=5)
+        good = ctx.fetch(url, identity="whitelist")
 
         detail = "\n".join(
             [
+                f"来源           {ctx.source_label}",
                 f"① 默认 UA      {bad.status_code}    {signal_header}: {ctx.dojo.blocked_by(bad)}",
                 f"② 伪装浏览器    {faked.status_code}    {signal_header}: {ctx.dojo.blocked_by(faked)}   "
                 f"X-Dojo-Allow: {faked.headers.get('X-Dojo-Allow') or '（无）'}",
@@ -90,6 +91,7 @@ class UaWhitelist(Lab):
         return Outcome.pass_(
             f"403 → 伪装 200（无白名单）→ 声明身份 200 + X-Dojo-Allow",
             self.level,
+            detail=detail,
             blocked_status=bad.status_code,
             faked_status=faked.status_code,
             good_status=good.status_code,

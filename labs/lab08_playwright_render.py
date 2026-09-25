@@ -21,6 +21,13 @@
   · 只是为了省掉分析工作 —— 分析一次，比每次跑浏览器便宜得多
 
 依赖：playwright 是可选依赖。没装时本实验跳过并打印安装命令。
+
+为什么离线跑不了
+----------------
+它要测的**就是**耗时，而且要真的执行页面脚本。快照里存的是一段静态 HTML，
+在它上面跑 Playwright 只会渲染出一个空壳（脚本没跟过来，也不该跟过来）——
+那样测出来的时间是"解析一个本地文件"的时间，不是"启动 Chromium 的时间"，
+两个数字放在一起比毫无意义。
 """
 
 from __future__ import annotations
@@ -44,6 +51,13 @@ class PlaywrightRender(Lab):
     teaches = "渲染是最后手段 —— 用耗时差证明这句话"
     needs = ["L4"]
     chapter = "7"
+
+    live_only = True
+    live_only_reason = (
+        "本实验要测的就是真实渲染耗时，而快照是静态 HTML —— 在它上面跑浏览器"
+        "得到的是'解析本地文件'的时间，对照就失去意义了。"
+        "起靶场：python -m server.main --level L4"
+    )
 
     def run(self, ctx: LabContext) -> Outcome:
         early = self.require(ctx, "L4")

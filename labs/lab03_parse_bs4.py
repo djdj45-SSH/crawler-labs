@@ -15,11 +15,15 @@
 ----------
 **先断言行数，再取字段。** 不检查就 `.get_text()`，页面一改你会拿到一堆空字符串，
 而且不会报错 —— 错误会一路传到数据库里。
+
+这一章是最该离线跑的一章
+------------------------
+调一个选择器不该先起一个服务。抓一次快照，之后所有选择器的调试都对着它跑 ——
+一天跑一百次也不会打自己的服务器。而且模板改版之后，旧快照还能复现历史上的解析 bug。
 """
 
 from __future__ import annotations
 
-import requests
 from bs4 import BeautifulSoup
 
 from .base import Lab, LabContext, Outcome
@@ -35,12 +39,13 @@ class ParseBs4(Lab):
 
     def run(self, ctx: LabContext) -> Outcome:
         url = ctx.dojo.url(ctx.dojo.endpoints["index"])
-        r = requests.get(url, headers=ctx.dojo.whitelist_headers, timeout=5)
+        r = ctx.fetch(url, identity="whitelist")
 
         if r.status_code != 200:
             return Outcome.fail(
                 f"{r.status_code}",
-                f"{url}\n被挡住的信号头：{ctx.dojo.blocked_by(r)}",
+                f"{url}\n来源：{ctx.source_label}\n"
+                f"被挡住的信号头：{ctx.dojo.blocked_by(r)}",
                 self.level,
             )
 
@@ -56,6 +61,7 @@ class ParseBs4(Lab):
         detail = "\n".join(
             [
                 f"URL        {url}",
+                f"来源        {ctx.source_label}",
                 f"解析器      lxml",
                 f"li 行数     {len(items)}",
                 f"标题        {titles[0] if titles else '（无）'}",
@@ -86,6 +92,7 @@ class ParseBs4(Lab):
         return Outcome.pass_(
             f"解析出 {len(items)} 条 · 例：{titles[0][:16]}…",
             self.level,
+            detail=detail,
             count=len(items),
             first_title=titles[0],
         )

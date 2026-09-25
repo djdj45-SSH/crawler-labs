@@ -19,6 +19,12 @@
 
 它拦住的不是"爬得慢的人"，是**"先把 URL 清单列出来、之后再慢慢抓"**的人：
 那份清单在 30 秒后全部作废。
+
+为什么离线跑不了
+----------------
+这一级的对错由**服务端现场验签**决定，而时间窗是 30 秒。
+快照里存的是一次响应的结果，不是"服务端会不会接受这个签名"的判定过程 ——
+把 ③ 和 ④ 冻下来等于把答案抄在纸上，读者验不到任何东西。
 """
 
 from __future__ import annotations
@@ -39,6 +45,12 @@ class Signature(Lab):
     teaches = "签名该签什么 —— 这是给「守」的一课"
     needs = ["L5"]
     chapter = "8"
+
+    live_only = True
+    live_only_reason = (
+        "验签是服务端现场做的，而且时间窗只有 30 秒 —— 快照只能冻下结果，"
+        "冻不下判定过程。起靶场：python -m server.main --level L5"
+    )
 
     def run(self, ctx: LabContext) -> Outcome:
         early = self.require(ctx, "L5")

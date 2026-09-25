@@ -19,13 +19,18 @@
 第 3 步的做法值得注意：拒收一定要留痕。真实场景里这条规则会误伤
 （两篇文章引用同一段长文是可能的），所以被拒的条目要能一眼看到、能复核。
 静默丢弃比不校验更危险 —— 你会以为数据是完整的。
+
+离线也能跑：它取的是白名单身份下的内容层，不随防护等级变
+------------------------------------------------------
+顺带说明一件容易被忽略的事：**落库这一步其实与反爬无关。**
+它是"数据工程的最后一公里"——谁来抓、抓得顺不顺，都不影响"存得对不对"。
+所以拿快照跑它反而是最合适的方式：数据源固定，才能专心验证幂等。
 """
 
 from __future__ import annotations
 
 import pathlib
 
-import requests
 from sqlalchemy.orm import Session
 
 from storage.models import init_db, log_fetch, make_engine, stats, upsert
@@ -58,18 +63,20 @@ class StoreSqlite(Lab):
         init_db(engine)
 
         url = ctx.dojo.url(ctx.dojo.endpoints["list_json"])
-        r = requests.get(url, headers=ctx.dojo.whitelist_headers, timeout=5)
+        r = ctx.fetch(url, identity="whitelist")
         if r.status_code != 200:
             return Outcome.fail(
                 f"{r.status_code}",
-                f"{url}\n本实验用白名单身份取真数据，避免防护干扰",
+                f"{url}\n来源：{ctx.source_label}\n"
+                "本实验用白名单身份取真数据，避免防护干扰",
                 self.level,
             )
         rows = r.json()
 
         with Session(engine) as s:
             first = upsert(s, rows)
-            log_fetch(s, url=url, status=r.status_code, rows=len(rows), identity="whitelist")
+            log_fetch(s, url=url, status=r.status_code, rows=len(rows),
+                      identity=f"whitelist@{ctx.source_label}")
 
         # ---- ② 重复抓取：幂等 ----
         with Session(engine) as s:
@@ -139,6 +146,7 @@ class StoreSqlite(Lab):
         return Outcome.pass_(
             f"入库 {first['inserted']} 条 · 重跑新增 0 · 拒收脏数据 {len(third['rejected'])} 条",
             self.level,
+            detail=detail,
             inserted=first["inserted"],
             idempotent=second["inserted"] == 0,
             rejected=len(third["rejected"]),

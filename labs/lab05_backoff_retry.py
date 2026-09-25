@@ -17,6 +17,12 @@ tenacity 在 requirements 里，生产代码该用它。但这里手写一遍指
   加抖动       → 打散同时性，避免"退避步调一致"这种隐性同步
 
 真实站点上，抖动（jitter）往往比退避本身更重要。
+
+为什么这个实验离线跑不了
+------------------------
+限流是关于**时间**的：同一个窗口里第 6 次请求才被拦。快照是"某一刻的一份响应"，
+它连"这是第几次请求"这个概念都没有 —— 把 429 冻下来也复现不出"再多打一次就过了"。
+所以这一章必须对着活的靶场跑。
 """
 
 from __future__ import annotations
@@ -36,6 +42,12 @@ class BackoffRetry(Lab):
     teaches = "限流是唯一伪装没用的一级；退避 + 抖动才是解法"
     needs = ["L2"]
     chapter = "5"
+
+    live_only = True
+    live_only_reason = (
+        "限流是时间维度的现象（窗口内第 N 次才被拦），快照只有一份响应，复现不了 —— "
+        "起靶场：python -m server.main --level L2"
+    )
 
     MAX_ATTEMPTS = 12
 

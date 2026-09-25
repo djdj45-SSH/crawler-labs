@@ -15,6 +15,10 @@ data/
 fixtures/*.html
 fixtures/*.json
 
+# 快照：能从公开的靶场重新抓，而且一旦提交就可能悄悄过期 ——
+# 解析实验对着过期页面报"通过"，比失败更糟。详见 fixtures/README.md
+fixtures/snapshots/
+
 # 密钥
 .env
 .env.local

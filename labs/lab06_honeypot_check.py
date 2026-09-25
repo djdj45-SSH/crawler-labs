@@ -18,14 +18,21 @@
 
 真实站点上的假数据不会这么明显。这里做浅，是为了让四种校验方法可教。
 方法学会之后，换到真实场景只是把阈值调紧。
+
+离线跑时 F1 的基准日的讲究
+--------------------------
+蜜罐的假日期是**相对"抓取当天"**生成的（`date.today() + 9 天`）。
+所以一份快照放久之后，那些"未来日期"会自然变成过去 —— F1 就不再成立。
+这不是 bug，是快照会过期的真实样子，也顺带说明"未来日期"这种破绽有多脆。
+
+为了不让读者误以为"校验方法失效了"，离线模式下 F1 用**快照的抓取日**做基准：
+判定的是"在观察到它的那一刻，这个日期是不是在未来"。这在语义上也更准确 ——
+快照是对某一时刻的冻结观察，就该拿那一刻的钟去衡量它。
 """
 
 from __future__ import annotations
 
 import hashlib
-from datetime import date
-
-import requests
 
 from .base import Lab, LabContext, Outcome
 
@@ -46,7 +53,7 @@ class HoneypotCheck(Lab):
         lv = ctx.contract.level("L3")
         url = ctx.dojo.url(ctx.dojo.endpoints["list_json"])
 
-        r = requests.get(url, timeout=5)
+        r = ctx.fetch(url, identity="bare")
         guard = self.ensure_level(ctx, r, "L3")
         if guard:
             return guard
@@ -70,7 +77,7 @@ class HoneypotCheck(Lab):
         if not items:
             return Outcome.fail("蜜罐返回 0 条，没法校验", "", self.level)
 
-        today = date.today().isoformat()
+        today = ctx.reference_date.isoformat()
         findings: list[str] = []
 
         # ---- F1 时间范围 ----
@@ -91,7 +98,7 @@ class HoneypotCheck(Lab):
         # ---- F3 链接可达性 ----
         sample = items[0]
         detail_url = ctx.dojo.url(sample["url"])
-        probe = requests.get(detail_url, timeout=5)
+        probe = ctx.fetch(detail_url, identity="bare")
         if probe.status_code >= 400:
             findings.append(
                 f"F3 链接可达性  取样 {sample['url']} → {probe.status_code}（死链）"
@@ -108,13 +115,17 @@ class HoneypotCheck(Lab):
             )
 
         # ---- 对照：白名单拿到的是真数据 ----
-        real = requests.get(url, headers=ctx.dojo.whitelist_headers, timeout=5)
+        real = ctx.fetch(url, identity="whitelist")
         real_items = real.json() if real.status_code == 200 else []
         real_digests = {hashlib.sha1(x["body"].encode("utf-8")).hexdigest() for x in real_items}
 
         detail = "\n".join(
             [
                 f"URL           {url}",
+                f"来源           {ctx.source_label}",
+                f"基准日         {today}"
+                + ("   ← 快照抓取日；蜜罐的假日期是相对它生成的"
+                   if ctx.offline else "   ← 今天"),
                 f"状态码         {r.status_code}   ← 不是错误，是陷阱",
                 f"信号头         X-Dojo-Signal: {signal}",
                 f"条数           {len(items)}",
@@ -144,6 +155,7 @@ class HoneypotCheck(Lab):
         return Outcome.pass_(
             f"200 · {len(items)} 条假数据 · 四条破绽全部检出",
             self.level,
+            detail=detail,
             fake_count=len(items),
             flaws=[f.split()[0] for f in findings],
         )

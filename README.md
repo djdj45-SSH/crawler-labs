@@ -47,9 +47,28 @@ python main.py
 ```bash
 python main.py --list           # 只看清单
 python main.py --lab 04         # 只跑一个实验
-python main.py --verbose        # 打印内部步骤
+python main.py --verbose        # 打印内部步骤（通过的实验也打过程）
 python main.py --json           # 机器可读
 ```
+
+### 也可以不起靶场
+
+上面这套要两个终端来回切（因为防护是叠加的，看第 6 章得单独开 `--level L3`）。
+把"某一个等级下的响应"存下来就不用切了：
+
+```bash
+python snapshot.py --all          # 六个等级各抓一份（自己起靶场、抓完关掉，约 1 分钟）
+python main.py --snapshot auto    # 每个实验各用自己那一级
+```
+
+`--snapshot auto` 在**没有任何服务在跑**的情况下能过 7 项、跳过 4 项（都带理由）。
+第 1、2、3、4、6、7、9 章完全脱靶场；剩下 4 项（限流、渲染耗时、签名验证、真实站点）
+原理上就替代不了，它们会明确说出来。详见 [`fixtures/README.md`](fixtures/README.md)。
+
+> 一个意外的好处：**离线比在线能多跑通两项。**
+> 靶场是"防护叠加"的 —— `--level all` 下裸 UA 在 L1 就停下，第 6、7 章永远收不到
+> 那个请求，只能跳过（所以在线 `--level all` 是 6 通过 / 5 跳过）。
+> 而一份快照集合等价于"六台同时跑着的靶场"，每个实验找自己那一级说话。
 
 ---
 
@@ -74,6 +93,10 @@ python -m server.main --level all     # 第 12 章：综合
 
 跳过时实验会**明确告诉你该开哪一级**，不会假装通过 ——
 一个会在错误前提下报"成功"的实验，比没有实验更糟。
+
+（不想反复重开靶场的话，用快照：`python snapshot.py --all` 一次把六个等级都抓下来，
+之后 `python main.py --snapshot auto` 让每个实验各自找对应那一级。
+见下面的「也可以不起靶场」。）
 
 ---
 
@@ -125,15 +148,34 @@ python -m server.main --level all     # 第 12 章：综合
 契约里还带 `runtime.active_levels`，直接告诉你当前实际生效的是哪几级 ——
 不必猜，也不存在"我以为开的是 L3"这种歧义。
 
+**快照里冻结的是同一份东西。** `snapshot.py` 抓快照时会把当时的完整契约一起写进
+`manifest.json`，离线模式直接拿它当契约用 —— 于是 `require("L3")` 检查的
+"当前生效等级"就是快照抓取时的等级，**离线模式不需要写第二套判断逻辑**。
+这是"契约驱动"这个设计真正付红利的地方：加了离线能力，实验室代码一行没改。
+
 ---
 
-## 白名单
+## 三种身份
 
-`User-Agent` 含 `dojobot` 的请求跳过全部防护，直接拿真数据。
-本仓库的基础实验（01/02/03/11）都用这个身份。
+"我是谁"是这个项目里唯一的自变量。同一路径、同一时刻，换一个身份就换一份响应：
 
-这不是取巧：**真实世界里，一个有礼貌的爬虫第一次运行时就该带联系方式。**
+| 身份 | 请求长什么样 | 会被怎么对待 |
+|---|---|---|
+| `bare` | 没有 UA（`requests` 会填上自己的默认值） | 敲门就自报家门，L1 冲它来的 |
+| `browser` | `Mozilla/5.0 … Chrome/122` | 能过 L1，但**拿不到白名单标记** |
+| `whitelist` | `DojoBot/1.0 (+https://blog.djdj45.top/about.html)` | 跳过 L1–L5，直接拿真数据 |
+
+定义在 `dojo.py` 的 `IDENTITIES` / `headers_for()`，**抓取侧与读取侧共用一套** ——
+因为快照的索引键是 `(路径, 身份)`，两边对"身份"的理解一旦不一致，快照就会和实验室对不上。
+
+`whitelist` 不是取巧：**真实世界里，一个有礼貌的爬虫第一次运行时就该带联系方式。**
+本仓库的基础实验（01/02/03/11）都用这个身份，
 第 4 章才是故意把身份摘掉、看看会发生什么。
+
+> 顺带一个结论，它解释了为什么有些章节能离线、有些不能：
+> **内容层与防护层是正交的。** 白名单身份拿到的内容在任何等级下都一样，
+> 所以第 2、3 章的页面随便哪一份快照都能跑；而第 4、6、7 章看的正是防护层，
+> 必须用对应等级那一份。
 
 ---
 
@@ -141,22 +183,33 @@ python -m server.main --level all     # 第 12 章：综合
 
 ```
 crawler-labs/
-├── main.py                运行器：拉契约 → 跑实验 → 出矩阵
+├── main.py                运行器：拉契约 → 跑实验 → 出矩阵（含 --snapshot 离线模式）
 ├── dojo.py                契约客户端（唯一与靶场耦合的文件，而且耦合的是契约）
+│                          三种身份也定义在这里：IDENTITIES / headers_for()
+├── snapshot.py            抓快照：自己起靶场、按等级抓完、写 manifest、关掉
+├── snapshots.py           读快照：按 (路径, 身份) 取页，模仿 requests.Response
 ├── labs/
-│   ├── base.py            Lab / Outcome；require() 与 ensure_level()
+│   ├── base.py            Lab / Outcome / LabSkip；require() 与 ensure_level()
 │   ├── lab01..lab11       十一个实验，顺序即章节顺序
 │   └── __init__.py        清单（显式列出，不用魔法扫描）
 ├── scrapy_dojo/           第 8 章：一个完整的 Scrapy 工程
 │   ├── dojo_spider/       settings / items / middlewares / pipelines / spiders
 │   └── README.md          含五个"跑了才知道"的框架行为
 ├── storage/               SQLAlchemy 模型 + 幂等 upsert（实验 11 与 Scrapy 共用）
-├── fixtures/              契约缓存、HTML 快照（解析层离线测试用）
+├── fixtures/              契约缓存；snapshots/<tag>/ 是抓下来的 HTML 快照
 └── docs/
     ├── chapters.md        章节编排 + 还没做的事
     ├── chapter-11.md      第 11 章：写防护，给自己的站起步
     └── appendices.md      附录 A/B/C：请求库、解析库、存储方案对比
 ```
+
+### 取页面只有一条路
+
+实验室里**一律走 `ctx.fetch(url, identity=...)`**，不要直接 `requests.get`。
+这样同一段解析代码能对着实时靶场跑，也能对着快照跑 —— 这是整本书可复现的前提。
+
+只有真正离不开实时响应的实验才直接用 `requests`，并把 `live_only` 打开、写清理由
+（第 5、8、10 章和实验 08）。离线模式下它们会跳过并打印那句理由，不是静默消失。
 
 ### 第 8 章：Scrapy 工程
 
@@ -180,6 +233,15 @@ crawler-labs/
 如果你在别的脚本里手动发请求，记得也这么做。
 
 **Playwright 是可选依赖。** 实验 08 会跳过并打印安装命令。Chromium 约 150 MB。
+
+**快照会过期。** 尤其 `l3`：蜜罐的假日期是相对"抓取当天"生成的，
+放十几天之后那些"未来日期"就变成过去了，第 6 章的 F1 会自然失效。
+这不是 bug，是快照的真实性质；`lab06` 在离线模式下改用快照的抓取日做基准来规避它。
+要长期用就定期重抓：`python snapshot.py --all --force`。
+
+**在 L2 下抓快照，抓取动作本身会被限流。** `snapshot.py` 会按契约算出安全间隔
+自动放慢（`window/(limit-1)` 再留 15% 余量），不用手动管 —— 但如果看到那行
+"L2 生效：每页之间等 x.xs"，就知道它在等什么。
 
 ---
 

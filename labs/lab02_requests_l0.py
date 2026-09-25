@@ -4,11 +4,12 @@
 没有基线，后面每加一级你都无法判断"是这一级拦的"还是"本来就抓不到"。
 
 本实验对 `/api/articles` 做三件事：拿到 JSON、数条数、取出标题。
+
+用白名单身份 —— 所以这一页在任何等级下拿到的都一样，
+离线模式随便哪一份快照都能跑（见 snapshots.py 里"内容层与防护层正交"那段）。
 """
 
 from __future__ import annotations
-
-import requests
 
 from .base import Lab, LabContext, Outcome
 
@@ -23,12 +24,13 @@ class RequestsL0(Lab):
 
     def run(self, ctx: LabContext) -> Outcome:
         url = ctx.dojo.url(ctx.dojo.endpoints["list_json"])
-        r = requests.get(url, headers=ctx.dojo.whitelist_headers, timeout=5)
+        r = ctx.fetch(url, identity="whitelist")
 
         if r.status_code != 200:
             return Outcome.fail(
                 f"{r.status_code}",
-                f"{url}\n被挡住的信号头：{ctx.dojo.blocked_by(r)}\n"
+                f"{url}\n来源：{ctx.source_label}\n"
+                f"被挡住的信号头：{ctx.dojo.blocked_by(r)}\n"
                 "如果你故意想看裸爬被拦的样子，第 4 章会讲；本实验用白名单身份。",
                 self.level,
             )
@@ -44,6 +46,7 @@ class RequestsL0(Lab):
         detail = "\n".join(
             [
                 f"URL    {url}",
+                f"来源    {ctx.source_label}",
                 f"条数    {len(items)}",
                 f"slug   {', '.join(slugs[:4])}{' …' if len(slugs) > 4 else ''}",
                 "",
@@ -60,6 +63,7 @@ class RequestsL0(Lab):
         return Outcome.pass_(
             f"200 · {len(items)} 条 · 例：{titles[0][:18]}…",
             self.level,
+            detail=detail,
             count=len(items),
             slugs=slugs,
         )
