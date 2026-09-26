@@ -25,7 +25,7 @@ from .lab09_blog_capstone import BlogCapstone
 from .lab10_signature import Signature
 from .lab11_store_sqlite import StoreSqlite
 
-# 按章节顺序
+# 按章节顺序（lab10 时效签名在第 11 章 —— 守方线，不是攻线）
 LAB_CLASSES: list[type[Lab]] = [
     HttpBasics,           # 1
     RequestsL0,           # 2
@@ -35,9 +35,9 @@ LAB_CLASSES: list[type[Lab]] = [
     HoneypotCheck,        # 6
     JsPayload,            # 7
     PlaywrightRender,     # 7（对照）
-    Signature,            # 8
     StoreSqlite,          # 9
     BlogCapstone,         # 10
+    Signature,            # 11（守方：写防护）
 ]
 
 

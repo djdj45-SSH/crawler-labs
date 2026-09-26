@@ -44,7 +44,7 @@ class Signature(Lab):
     level = "L5"
     teaches = "签名该签什么 —— 这是给「守」的一课"
     needs = ["L5"]
-    chapter = "8"
+    chapter = "11"
 
     live_only = True
     live_only_reason = (

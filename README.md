@@ -1,110 +1,57 @@
 # crawler-labs —— 零基础 Python 爬虫
 
-**不是库手册，是攻防回合。** 每一章先让错误姿势失败一次，再给正确姿势 ——
+**这是一本书的配套实验库。** 课文在 [`book/`](book/)，每章课文 + 每章一组实验。
+不是库手册，是攻防回合：每一章先让错误姿势失败一次，再给正确姿势 ——
 只讲正确姿势的教程，读者记不住为什么。
 
-配套靶场：[**crawler-dojo**](https://github.com/djdj45-SSH/crawler-dojo)（守）。
-那边提供六级递增的防护，这边逐级应对。真实站点的收官案例用的是本项目的博客
-[blog.djdj45.top](https://blog.djdj45.top)，**它自己就带着反爬**，
-所以那一段是真实战场，不是模拟。
+配套靶场：[**crawler-dojo**](https://github.com/djdj45-SSH/crawler-dojo)。
+它提供六级递增的防护（L0–L5），这本书逐级应对；最后两章打真实站点
+[blog.djdj45.top](https://blog.djdj45.top)——它自己就带着反爬，是真实战场。
 
 > 不加 shields.io 徽章是有意的：那个服务在国内经常加载不出来，会显示成裂图。
 > 纯文本链接在任何网络下都能用。
 
 ---
 
-## 快速开始
+## 60 秒上手
 
-两个终端。先起靶场：
+```bash
+pip install -r requirements.txt
+python snapshot.py --all          # 六个等级各抓一份快照（约 1 分钟，自起自停靶场）
+python main.py --chapter 1        # 从第 1 章开始
+```
+
+`--chapter N` 是读者的正门：只跑本章实验，并告诉你这一章该怎么打靶场。
+**靶场没起也没关系**——本地有快照时它会自动改用快照离线跑（结果一样，会明说）。
+
+想在线打（看到的是活的 403/限流），在另一个终端：
 
 ```bash
 cd ../crawler-dojo
-pip install -r requirements.txt
-python -m server.main --level all
+python -m server.main --level L1        # 等级按章选，见下表
 ```
-
-再跑实验：
-
-```bash
-pip install -r requirements.txt
-python main.py
-```
-
-输出是一张通过矩阵：
-
-```
-章   实验                                        等级   结果   结论
-────────────────────────────────────────────────────────────────────────────────
-1    01 HTTP 基础：读状态码 / 响应头 / 编码       —     通过   200 · application/json · 4346 字节
-2    02 L0 基线：用 requests 拿到数据             L0    通过   200 · 6 条 · 例：DOJO-1 基线读数…
-4    04 L1：默认 UA 被拦 → 伪装 vs 声明身份       L1    通过   403 → 伪装 200（无白名单）→ 声明身份 200 + X-Dojo-Allow
-5    05 L2：读 Retry-After 并退避重试             L2    跳过   靶场未开启 L2（当前生效：L1–L5）—— …
-...
-```
-
-其他用法：
-
-```bash
-python main.py --list           # 只看清单
-python main.py --lab 04         # 只跑一个实验
-python main.py --verbose        # 打印内部步骤（通过的实验也打过程）
-python main.py --json           # 机器可读
-```
-
-### 也可以不起靶场
-
-上面这套要两个终端来回切（因为防护是叠加的，看第 6 章得单独开 `--level L3`）。
-把"某一个等级下的响应"存下来就不用切了：
-
-```bash
-python snapshot.py --all          # 六个等级各抓一份（自己起靶场、抓完关掉，约 1 分钟）
-python main.py --snapshot auto    # 每个实验各用自己那一级
-```
-
-`--snapshot auto` 在**没有任何服务在跑**的情况下能过 7 项、跳过 4 项（都带理由）。
-第 1、2、3、4、6、7、9 章完全脱靶场；剩下 4 项（限流、渲染耗时、签名验证、真实站点）
-原理上就替代不了，它们会明确说出来。详见 [`fixtures/README.md`](fixtures/README.md)。
-
-```bash
-cd scrapy_dojo && scrapy crawl articles -s DOJO_SNAPSHOT=auto   # 第 8 章读的是同一批快照
-```
-
-> 一个意外的好处：**离线比在线能多跑通两项。**
-> 靶场是"防护叠加"的 —— `--level all` 下裸 UA 在 L1 就停下，第 6、7 章永远收不到
-> 那个请求，只能跳过（所以在线 `--level all` 是 6 通过 / 5 跳过）。
-> 而一份快照集合等价于"六台同时跑着的靶场"，每个实验找自己那一级说话。
 
 ---
 
-## ⚠️ 先读这一条：防护是叠加的
+## 学习地图
 
-这是最容易卡住的地方。
+全书五大部分，每部分是一道坎：
 
-`--level all` 下，你的请求会在 **L1 就被拦下**，根本到不了 L2/L3/L4/L5。
-所以那些实验会显示"跳过"，而不是"失败"。
+| 部分 | 章 | 读者跨过的坎 | 本章在线跑法 |
+|---|---|---|---|
+| **I 第一性：网页就是数据** | 1–3 | 请求 → 响应 → 解析的最小闭环 | `--level none` |
+| **II 身份：爬虫的自我介绍** | 4–6 | 被拦(403)、被限速(429)、被骗(蜜罐)各亲历一次 | `--level L1` / `L2` / `L3` |
+| **III 硬骨头：HTML 里没数据** | 7 | 换数据源，而不是上来就开浏览器 | `--level L4` |
+| **IV 工程：从脚本到项目** | 8–9 | Scrapy 三件套 + 幂等入库 | 第 8 章用 scrapy 命令，第 9 章 `--level none` |
+| **V 真实世界：攻与守** | 10–12 | 真站 → 守方视角 → 合规收官 | 第 11 章 `--level L5` |
 
-**这不是缺陷，是真实世界的样子**：前一级生效，后一级就永远看不到那个请求。
-
-想观察后面几级，就把它单独开起来：
-
-```bash
-python -m server.main --level L2      # 第 5 章：限流
-python -m server.main --level L3      # 第 6 章：蜜罐
-python -m server.main --level L4      # 第 7 章：空壳
-python -m server.main --level L5      # 第 8 章：签名
-python -m server.main --level all     # 第 12 章：综合
-```
-
-跳过时实验会**明确告诉你该开哪一级**，不会假装通过 ——
-一个会在错误前提下报"成功"的实验，比没有实验更糟。
-
-（不想反复重开靶场的话，用快照：`python snapshot.py --all` 一次把六个等级都抓下来，
-之后 `python main.py --snapshot auto` 让每个实验各自找对应那一级。
-见下面的「也可以不起靶场」。）
+每章的过关检查：`python main.py --chapter N` 全部"通过"。
+第 5 章（限流）、实验 08（渲染耗时）、第 10 章（真站）、第 11 章（验签）原理上离不开
+实时请求，离线会明确跳过并说明理由——**不是"剩下的都没做"**。
 
 ---
 
-## 实验清单
+## 章节与实验对照
 
 | 章 | 实验 | 等级 | 学什么 |
 |---|---|---|---|
@@ -116,11 +63,9 @@ python -m server.main --level all     # 第 12 章：综合
 | 6 | 06 蜜罐校验 | L3 | **爬到 ≠ 有效**。四种机械可判的校验 |
 | 7 | 07 脚本载荷 | L4 | 上浏览器是最后手段，先找数据源 |
 | 7 | 08 浏览器对照 | L4 | 用耗时差证明上一句话（需 playwright，可选） |
-| 8 | 10 时效签名 | L5 | 签名该签什么 —— 这是给「守」的一课 |
 | 9 | 11 数据落地 | — | 幂等 upsert；**拒收要留痕，不能静默丢弃** |
 | 10 | 09 真实战场 | — | blog.djdj45.top：**连 sitemap 都被改道了** |
-
-详细章节编排见 [`docs/chapters.md`](docs/chapters.md)。
+| 11 | 10 时效签名 | L5 | **守方视角**：给自己的接口加签名，该签什么 |
 
 ### 三个最值钱的实验
 
@@ -140,117 +85,33 @@ python -m server.main --level all     # 第 12 章：综合
 
 ---
 
-## 契约驱动：为什么规则不复制一份
+## 其他用法（作者/自查工具）
 
-爬虫侧不写任何"第几级是什么"的知识，全部从 `GET /__dojo/contract` 拉。
-
-因为把规则在两处各写一遍，**它们一定会漂移** —— 改了靶场忘了改爬虫，
-你跑出错误结论，然后会以为是自己的代码写错了。
-
-契约一旦拉到就落盘到 `fixtures/contract.cache.json`，靶场没起也能读缓存。
-
-契约里还带 `runtime.active_levels`，直接告诉你当前实际生效的是哪几级 ——
-不必猜，也不存在"我以为开的是 L3"这种歧义。
-
-**快照里冻结的是同一份东西。** `snapshot.py` 抓快照时会把当时的完整契约一起写进
-`manifest.json`，离线模式直接拿它当契约用 —— 于是 `require("L3")` 检查的
-"当前生效等级"就是快照抓取时的等级，**离线模式不需要写第二套判断逻辑**。
-这是"契约驱动"这个设计真正付红利的地方：加了离线能力，实验室代码一行没改。
-
----
-
-## 三种身份
-
-"我是谁"是这个项目里唯一的自变量。同一路径、同一时刻，换一个身份就换一份响应：
-
-| 身份 | 请求长什么样 | 会被怎么对待 |
-|---|---|---|
-| `bare` | 没有 UA（`requests` 会填上自己的默认值） | 敲门就自报家门，L1 冲它来的 |
-| `browser` | `Mozilla/5.0 … Chrome/122` | 能过 L1，但**拿不到白名单标记** |
-| `whitelist` | `DojoBot/1.0 (+https://blog.djdj45.top/about.html)` | 跳过 L1–L5，直接拿真数据 |
-
-定义在 `dojo.py` 的 `IDENTITIES` / `headers_for()`，**抓取侧与读取侧共用一套** ——
-因为快照的索引键是 `(路径, 身份)`，两边对"身份"的理解一旦不一致，快照就会和实验室对不上。
-
-`whitelist` 不是取巧：**真实世界里，一个有礼貌的爬虫第一次运行时就该带联系方式。**
-本仓库的基础实验（01/02/03/11）都用这个身份，
-第 4 章才是故意把身份摘掉、看看会发生什么。
-
-> 顺带一个结论，它解释了为什么有些章节能离线、有些不能：
-> **内容层与防护层是正交的。** 白名单身份拿到的内容在任何等级下都一样，
-> 所以第 2、3 章的页面随便哪一份快照都能跑；而第 4、6、7 章看的正是防护层，
-> 必须用对应等级那一份。
-
----
-
-## 目录结构
-
-```
-crawler-labs/
-├── main.py                运行器：拉契约 → 跑实验 → 出矩阵（含 --snapshot 离线模式）
-├── dojo.py                契约客户端（唯一与靶场耦合的文件，而且耦合的是契约）
-│                          三种身份也定义在这里：IDENTITIES / headers_for()
-├── snapshot.py            抓快照：自己起靶场、按等级抓完、写 manifest、关掉
-├── snapshots.py           读快照：按 (路径, 身份) 取页，模仿 requests.Response
-├── labs/
-│   ├── base.py            Lab / Outcome / LabSkip；require() 与 ensure_level()
-│   ├── lab01..lab11       十一个实验，顺序即章节顺序
-│   └── __init__.py        清单（显式列出，不用魔法扫描）
-├── scrapy_dojo/           第 8 章：一个完整的 Scrapy 工程
-│   ├── dojo_spider/       settings / items / middlewares / snapshot / pipelines / spiders
-│   └── README.md          含五个"跑了才知道"的框架行为 + 离线模式
-├── storage/               SQLAlchemy 模型 + 幂等 upsert（实验 11 与 Scrapy 共用）
-├── fixtures/              契约缓存；snapshots/<tag>/ 是抓下来的 HTML 快照
-└── docs/
-    ├── chapters.md        章节编排 + 还没做的事
-    ├── chapter-11.md      第 11 章：写防护，给自己的站起步
-    └── appendices.md      附录 A/B/C：请求库、解析库、存储方案对比
+```bash
+python main.py --list             # 只看清单
+python main.py                    # 按章序跑全部（全景矩阵）
+python main.py --snapshot auto    # 全部离线：每个实验各用自己那一级快照
+python main.py --lab 04           # 只跑一个实验
+python main.py --verbose          # 打印内部步骤
+python main.py --json             # 机器可读
 ```
 
-### 取页面只有一条路
-
-实验室里**一律走 `ctx.fetch(url, identity=...)`**，不要直接 `requests.get`。
-这样同一段解析代码能对着实时靶场跑，也能对着快照跑 —— 这是整本书可复现的前提。
-
-只有真正离不开实时响应的实验才直接用 `requests`，并把 `live_only` 打开、写清理由
-（第 5、8、10 章和实验 08）。离线模式下它们会跳过并打印那句理由，不是静默消失。
-
-第 8 章的 Scrapy 工程里是同一条规则的另一种写法：**一个下载器中间件**
-（`dojo_spider/snapshot.py`）在 `process_request` 里直接返回冻结的响应。
-spider、items、9 个管道一行都没改 —— 这恰好说明"取页面走同一个入口"
-不是脚本级的取巧，而是这个做法本身的性质。
-
-### 第 8 章：Scrapy 工程
-
-前面 11 个实验都是"一个脚本解决一个问题"。第 8 章换成框架，回答两个新问题：
-前面的结论还成立吗（成立），以及**框架帮你做了什么、又瞒着你什么**。
-
-后者的答案值得单独去读 —— 比如 Scrapy 2.19 里
-**`start_requests()` 已经完全不被调用**（网上教程还在教它），
-而且失效时**不报任何错**。见 [`scrapy_dojo/README.md`](scrapy_dojo/README.md)。
+全景矩阵下实验会**跳过**而不是失败——防护是叠加的，`--level all` 下裸 UA 在 L1
+就被拦下，后几级根本收不到请求。这不是缺陷，是真实世界的样子。
 
 ---
 
-## 已知的环境坑
+## 文档地图
 
-**代理会让本地靶场看起来像坏了。** 有些环境（公司网关、抓包工具、CI 沙箱）会设
-`http_proxy`，于是 `requests` 把 `127.0.0.1:8000` 的请求也发给代理，
-你拿到的是代理的错误响应（502、空响应、缺了契约信号头），
-而它看起来完全是"靶场出问题了"。
-
-`dojo.py` 在导入时会把 loopback 补进 `no_proxy`，正常情况下你不会遇到这个问题。
-如果你在别的脚本里手动发请求，记得也这么做。
-
-**Playwright 是可选依赖。** 实验 08 会跳过并打印安装命令。Chromium 约 150 MB。
-
-**快照会过期。** 尤其 `l3`：蜜罐的假日期是相对"抓取当天"生成的，
-放十几天之后那些"未来日期"就变成过去了，第 6 章的 F1 会自然失效。
-这不是 bug，是快照的真实性质；`lab06` 在离线模式下改用快照的抓取日做基准来规避它。
-要长期用就定期重抓：`python snapshot.py --all --force`。
-
-**在 L2 下抓快照，抓取动作本身会被限流。** `snapshot.py` 会按契约算出安全间隔
-自动放慢（`window/(limit-1)` 再留 15% 余量），不用手动管 —— 但如果看到那行
-"L2 生效：每页之间等 x.xs"，就知道它在等什么。
+| 想看什么 | 去哪 |
+|---|---|
+| 课文（样章：第 1、2 章） | [`book/`](book/) |
+| 全书教学总纲（逐章到函数级） | [`docs/book-plan.md`](docs/book-plan.md) |
+| 工程设计：为什么契约驱动、快照机制、`ctx.fetch` 规则 | [`docs/dev-design.md`](docs/dev-design.md) |
+| 章节编排的历史版 + 待办 | [`docs/chapters.md`](docs/chapters.md) |
+| 快照格式与离线能力细节 | [`fixtures/README.md`](fixtures/README.md) |
+| 第 8 章 Scrapy 工程的框架行为记录 | [`scrapy_dojo/README.md`](scrapy_dojo/README.md) |
+| 请求库/解析库/存储方案对比 | [`docs/appendices.md`](docs/appendices.md) |
 
 ---
 

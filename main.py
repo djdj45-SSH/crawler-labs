@@ -4,6 +4,7 @@
 用法
 ----
     python main.py                  # 按章节顺序跑全部
+    python main.py --chapter 4      # 只跑第 4 章（读者路径：自动选等级/快照）
     python main.py --lab 04         # 只跑实验 04
     python main.py --list           # 只看清单，不跑
     python main.py --verbose        # 打印每个实验的内部步骤
@@ -62,6 +63,31 @@ DEFAULT_DOJO = os.environ.get("DOJO_BASE_URL", "http://127.0.0.1:8000")
 #: 契约里的等级全集。用来把 lab.level（可能是 "—"）折成一个快照标签。
 KNOWN_LEVELS = ("L0", "L1", "L2", "L3", "L4", "L5")
 
+#: 章节元信息：部分名 / 章标题 / 在线模式下该章对应的靶场等级提示。
+#: 只列有矩阵实验的章；第 8、12 章没有（见 CHAPTER_GUIDES）。
+CHAPTER_META = {
+    "1": ("第一部分 · 第一性", "你的第一次请求", "靶场任意等级（建议 --level none）"),
+    "2": ("第一部分 · 第一性", "裸爬：拿到第一批数据", "靶场任意等级（建议 --level none）"),
+    "3": ("第一部分 · 第一性", "解析：网页不是 JSON", "靶场任意等级；调选择器推荐离线快照"),
+    "4": ("第二部分 · 身份", "403：你被认出来了", "--level L1"),
+    "5": ("第二部分 · 身份", "429 与 Retry-After", "--level L2"),
+    "6": ("第二部分 · 身份", "200 也可能是假的：蜜罐", "--level L3"),
+    "7": ("第三部分 · 硬骨头", "HTML 里没有数据", "--level L4"),
+    "9": ("第四部分 · 工程", "落地：数据要能重复入库", "靶场任意等级"),
+    "10": ("第五部分 · 真实世界", "真实战场：博客", "不需要靶场，需要网络"),
+    "11": ("第五部分 · 真实世界", "写防护：坐到对面去", "--level L5"),
+}
+
+#: 没有矩阵实验的章怎么跑。
+CHAPTER_GUIDES = {
+    "8": "第 8 章是 Scrapy 工程，没有矩阵实验。跑法：\n\n"
+         "    cd scrapy_dojo\n"
+         "    scrapy crawl articles -s DOJO_SNAPSHOT=auto      # 离线\n"
+         "    scrapy crawl articles                            # 在线（靶场 --level L5）",
+    "12": "第 12 章是综合实战：直接跑全部实验收尾。\n\n"
+          "    python main.py        # 靶场用 --level all",
+}
+
 RESET = "\033[0m"
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
@@ -101,6 +127,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--dojo", default=DEFAULT_DOJO, help=f"靶场地址（默认 {DEFAULT_DOJO}）")
     ap.add_argument("--lab", help="只跑指定实验，例如 04 或 UaWhitelist")
+    ap.add_argument("--chapter", help="只跑某一章，例如 4（读者路径：给出该章等级提示，靶场没起时自动改用快照）")
     ap.add_argument("--list", action="store_true", help="只列出实验清单")
     ap.add_argument("--verbose", action="store_true", help="打印内部步骤")
     ap.add_argument("--json", action="store_true", help="以 JSON 输出结果")
@@ -113,6 +140,23 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     labs = all_labs()
+    chapter_key: str | None = None
+    if args.chapter:
+        chapter_key = args.chapter.strip().lstrip("0") or "0"
+        meta = CHAPTER_META.get(chapter_key)
+        guide = CHAPTER_GUIDES.get(chapter_key)
+        if meta is None and guide is None:
+            sys.stderr.write(f"\n没有第 {args.chapter.strip()} 章的实验。用 --list 看清单。\n")
+            return 2
+        if meta is None:
+            # 第 8、12 章这类"没有矩阵实验"的章，直接告诉读者怎么跑
+            print(guide or "")
+            return 0
+        labs = [lab for lab in labs if lab.chapter == chapter_key]
+        if not labs:
+            print(guide or f"第 {chapter_key} 章暂无矩阵实验。")
+            return 0
+
     if args.lab:
         one = find_lab(args.lab)
         if one is None:
@@ -153,7 +197,27 @@ def main(argv: list[str] | None = None) -> int:
         try:
             contract = fetch_contract(args.dojo)
         except ContractError as exc:
-            sys.stderr.write(f"\n[错误] {exc}\n\n")
+            contract = None
+            fetch_err = exc
+        else:
+            fetch_err = None
+            # 读者路径：契约来自缓存 = 靶场没起（fetch_contract 静默回退了缓存，
+            # 不抛错）—— 有快照就改离线跑，别让读者卡死在"先起服务"这一步。
+            if (chapter_key and contract.runtime.get("source") == "cache"
+                    and snapshots.available()):
+                fetch_err = "cache"
+
+        if fetch_err is not None and chapter_key and snapshots.available():
+            avail = snapshots.available()
+            offline = True
+            sys.stderr.write(
+                f"\n{YELLOW}[提示]{RESET} 没连上靶场（{args.dojo}），"
+                "改用本地快照离线跑本章 —— 该章能离线的实验结果与在线一致。\n"
+                f"{DIM}        在线跑法（在 crawler-dojo 目录）：{CHAPTER_META[chapter_key][2]}{RESET}\n\n"
+            )
+            contract = Contract.from_json(avail[0].contract_json)
+        elif fetch_err is not None:
+            sys.stderr.write(f"\n[错误] {fetch_err}\n\n")
             sys.stderr.write(
                 "  想离线看实验清单：python main.py --list\n"
                 "  想离线跑实验：     python snapshot.py --all && python main.py --snapshot auto\n"
@@ -161,6 +225,11 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     if not args.json:
+        if chapter_key:
+            part, title, hint = CHAPTER_META[chapter_key]
+            print(f"{CYAN}═══ 第 {chapter_key} 章 · {part} ═══{RESET}")
+            print(f"{DIM}《{title}》   本章在线跑法：{hint}{RESET}")
+            print()
         source = contract.runtime.get("source", "live")
         print(f"crawler-dojo 契约 v{contract.version}（来源：{source}）")
         if offline:
@@ -287,6 +356,11 @@ def main(argv: list[str] | None = None) -> int:
         if offline and used_tags:
             print(f"{DIM}用了快照：{'、'.join(sorted(used_tags))}"
                   f" · 目录 {snapshots.SNAPSHOT_DIR}{RESET}")
+        if chapter_key:
+            for n in range(int(chapter_key) + 1, 13):
+                if str(n) in CHAPTER_META or str(n) in CHAPTER_GUIDES:
+                    print(f"{DIM}本章完成。下一步：python main.py --chapter {n}{RESET}")
+                    break
 
     return 1 if any(not o.ok for _, o in results) else 0
 
