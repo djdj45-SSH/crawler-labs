@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 1 章 · 你的第一次请求（浏览器试玩版） · crawler-labs</title>
+<style>
+  :root{
+    --bg:#f6f7fb;--card:#ffffff;--line:#e5e7eb;--text:#1f2937;--mute:#6b7280;
+    --accent:#4f46e5;--accent-soft:#eef2ff;--green:#059669;--amber:#b45309;--red:#dc2626;
+    --code-bg:#0f172a;--code-text:#e2e8f0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);padding:40px 20px 64px;
+       font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       -webkit-font-smoothing:antialiased;line-height:1.7}
+  .wrap{max-width:880px;margin:0 auto}
+  .topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  .badge{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.05em;
+         color:var(--accent);background:var(--accent-soft);border:1px solid #c7d2fe;
+         padding:3px 10px;border-radius:999px}
+  .backlink{font-size:13px;color:var(--mute);text-decoration:none}
+  .backlink:hover{color:var(--accent)}
+  h1{font-size:26px;font-weight:700;margin:6px 0 10px}
+  .lead{font-size:14.5px;color:var(--mute);margin-bottom:20px}
+  .notice{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;
+          padding:14px 16px;font-size:13.5px;margin-bottom:20px}
+  .notice b{color:var(--amber)}
+  .notice ul{margin:6px 0 0 18px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;
+         padding:18px;margin-bottom:18px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .panel h2{font-size:15px;font-weight:700;margin-bottom:10px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{font-size:12.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);
+        background:#fff;color:var(--text);cursor:pointer;transition:.15s}
+  .chip:hover{border-color:var(--accent);color:var(--accent)}
+  .chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  textarea{width:100%;min-height:230px;resize:vertical;background:var(--code-bg);
+           color:var(--code-text);border:none;border-radius:10px;padding:14px;
+           font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+           font-size:13.5px;line-height:1.65;outline:none;white-space:pre;overflow:auto}
+  .toolbar{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap}
+  button.primary{background:var(--accent);color:#fff;border:none;border-radius:8px;
+        padding:9px 22px;font-size:14px;font-weight:600;cursor:pointer}
+  button.primary:hover{background:#4338ca}
+  button.primary:disabled{background:#a5b4fc;cursor:not-allowed}
+  .hint{font-size:12.5px;color:var(--mute)}
+  #pill{font-size:12.5px;font-weight:600;padding:4px 12px;border-radius:999px}
+  #pill.loading{background:#fef3c7;color:var(--amber)}
+  #pill.ready{background:#d1fae5;color:var(--green)}
+  #pill.fail{background:#fee2e2;color:var(--red)}
+  #console{background:var(--code-bg);border-radius:10px;padding:14px;min-height:90px;
+           max-height:340px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+           font-size:13px;line-height:1.6}
+  #console .line{white-space:pre-wrap;word-break:break-all;color:var(--code-text)}
+  #console .err{color:#fbbf24}
+  #console .error{color:#f87171}
+  #console .sys{color:#64748b;font-style:italic}
+  .foot{font-size:13px;color:var(--mute);border-top:1px solid var(--line);padding-top:16px}
+  .foot a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <span class="badge">浏览器试玩版 · 零安装</span>
+    <a class="backlink" href="../ch01/">← 返回课文 · 第 1 章</a>
+    <a class="backlink" href="../">导读</a>
+    <span id="pill" class="loading">Python 环境加载中…</span>
+  </div>
+
+  <h1>你的第一次请求</h1>
+  <p class="lead">
+    左边不用装任何东西——点「运行」，浏览器里就会跑真的 Python，向真实网络发一次请求。
+    五个示例按课文 1.1–1.5 的顺序排列，代码可以随便改，改完再跑。
+  </p>
+
+  <div class="notice">
+    <b>这是沙箱版，不是真实环境。</b>三件事要先说清楚：
+    <ul>
+      <li>Python 由 <a href="https://pyodide.org" target="_blank" rel="noopener">Pyodide</a> 在浏览器里运行，requests 请求打的是公开测试服务 <code>httpbin.org</code>——不是本书的练习靶场；</li>
+      <li><b>User-Agent 改不动</b>：浏览器安全层禁止，示例 ④ 会让你亲眼看一次——这正是第 4 章必须回到本地环境的原因；</li>
+      <li>请保持礼貌：示例按钮点着玩没问题，别写死循环轰炸别人的测试服务。</li>
+    </ul>
+  </div>
+
+  <div class="panel">
+    <h2>示例（点一下载入编辑器）</h2>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="panel">
+    <h2>代码编辑器</h2>
+    <textarea id="editor" spellcheck="false"></textarea>
+    <div class="toolbar">
+      <button class="primary" id="runBtn" disabled>▶ 运行</button>
+      <span class="hint">Ctrl+Enter 也可以运行</span>
+      <span style="flex:1"></span>
+      <span class="hint">requests 已由 pyodide-http 打补丁，可正常发 GET</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>输出</h2>
+    <div id="console"><div class="line sys">（运行后输出显示在这里）</div></div>
+  </div>
+
+  <div class="foot">
+    体验完接下来去哪：<a href="../ch01/">读第 1 章课文</a>（对着本地靶场跑完整版）→
+    第 3 章前按导读页部署 <a href="https://github.com/djdj45-SSH/crawler-dojo" target="_blank" rel="noopener">crawler-dojo 靶场</a>。
+    沙箱版覆盖不到第 4 章之后的内容——浏览器不允许。
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+const SNIPPETS = [
+  { label: "① 90 秒现象", code:
+`import requests
+
+r = requests.get("https://httpbin.org/get")
+print(r.status_code)
+print(r.text[:120])` },
+  { label: "② 门牌号 status_code", code:
+`import requests
+
+for path in ("/get", "/status/404", "/status/500"):
+    r = requests.get("https://httpbin.org" + path)
+    print(path, "->", r.status_code)` },
+  { label: "③ 信封上写了什么", code:
+`import requests
+
+r = requests.get("https://httpbin.org/get")
+data = r.json()
+print("Host 头 :", data["headers"].get("Host"))
+print("你的 UA :", data["headers"].get("User-Agent"))` },
+  { label: "④ 试试改 UA（会失败）", code:
+`import requests
+
+r = requests.get(
+    "https://httpbin.org/get",
+    headers={"User-Agent": "DojoBot/1.0 (+https://blog.djdj45.top/about.html)"},
+)
+print("requests 层想发的 UA : DojoBot/1.0")
+print("服务器实际收到的 UA :", r.json()["headers"].get("User-Agent"))
+print()
+print("改不动？这就是浏览器沙箱。课文第 4 章在本地环境里重演这个实验，")
+print("那次 UA 是真的能改的——改对了 200，改错了 403。")` },
+  { label: "⑤ 字节怎么变文字", code:
+`import requests
+
+r = requests.get("https://httpbin.org/html")
+print("encoding:", r.encoding)
+print("--- 正文前 200 字符 ---")
+print(r.text[:200])` },
+  { label: "⑥ 一条命令拿结构", code:
+`import requests
+
+r = requests.get("https://httpbin.org/json")
+slideshow = r.json()["slideshow"]
+print("顶层键:", list(slideshow.keys()))
+print("title:", slideshow["title"])` },
+];
+
+const editor = document.getElementById("editor");
+const chips = document.getElementById("chips");
+const runBtn = document.getElementById("runBtn");
+const pill = document.getElementById("pill");
+const consoleEl = document.getElementById("console");
+let pyodide = null;
+
+function log(text, cls) {
+  if (consoleEl.querySelector(".sys")) consoleEl.innerHTML = "";
+  const div = document.createElement("div");
+  div.className = "line " + (cls || "");
+  div.textContent = text;
+  consoleEl.appendChild(div);
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+function setPill(state, text) {
+  pill.className = state;
+  pill.textContent = text;
+}
+
+SNIPPETS.forEach((s, i) => {
+  const b = document.createElement("button");
+  b.className = "chip" + (i === 0 ? " active" : "");
+  b.textContent = s.label;
+  b.onclick = () => {
+    editor.value = s.code;
+    chips.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+    b.classList.add("active");
+  };
+  chips.appendChild(b);
+});
+editor.value = SNIPPETS[0].code;
+
+async function boot() {
+  try {
+    pyodide = await loadPyodide();
+    await pyodide.loadPackage("micropip");
+    const micropip = pyodide.pyimport("micropip");
+    await micropip.install("requests");
+    await micropip.install("pyodide-http");
+    await pyodide.runPythonAsync("import pyodide_http; pyodide_http.patch_all()");
+    setPill("ready", "✓ Python 就绪（沙箱版）");
+    runBtn.disabled = false;
+    log("沙箱版就绪。点上方示例或直接改代码，然后点「运行」。", "sys");
+  } catch (e) {
+    setPill("fail", "✗ 加载失败");
+    log("Python 环境加载失败（多为 CDN 不可达）：" + (e.message || e), "error");
+    log("兜底方案：改用本地环境 —— 安装 Python 后直接跟课文跑。", "error");
+  }
+}
+
+async function run() {
+  if (!pyodide) { log("Python 还在加载，稍等几秒再点。", "err"); return; }
+  runBtn.disabled = true;
+  consoleEl.innerHTML = "";
+  pyodide.setStdout({ batched: s => log(s, "out") });
+  pyodide.setStderr({ batched: s => log(s, "err") });
+  try {
+    await pyodide.runPythonAsync(editor.value);
+  } catch (e) {
+    (e.message || String(e)).split("\n").forEach(l => log(l, "error"));
+  }
+  runBtn.disabled = false;
+}
+
+runBtn.onclick = run;
+editor.addEventListener("keydown", ev => {
+  if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") { ev.preventDefault(); run(); }
+});
+
+boot();
+</script>
+</body>
+</html>

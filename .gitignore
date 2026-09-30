@@ -28,3 +28,6 @@ fixtures/snapshots/
 .idea/
 *.swp
 .DS_Store
+
+# mkdocs 构建产物
+site/

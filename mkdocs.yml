@@ -1,0 +1,53 @@
+site_name: crawler-labs · 爬虫攻防靶场
+site_description: 零基础 Python 爬虫教程 · 12 个攻防回合 · 从裸爬到工程化
+site_url: https://djdj45-ssh.github.io/crawler-labs/
+repo_url: https://github.com/djdj45-SSH/crawler-labs
+repo_name: djdj45-SSH/crawler-labs
+
+# 课文目录即站点源：book/ 是唯一事实来源，docs/ 是内部设计文档（不发布）
+docs_dir: book
+site_dir: site
+
+exclude_docs: |
+  README.md
+
+theme:
+  name: material
+  language: zh
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/weather-night
+        name: 切到深色
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: 切到浅色
+  features:
+    - content.code.copy
+    - navigation.footer
+    - navigation.top
+    - navigation.indexes
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - 导读: index.md
+  - 浏览器试玩（零安装）:
+      - 第 1 章 · 你的第一次请求: interactive/ch01.html
+      - 第 2 章 · 裸爬拿数据: interactive/ch02.html
+  - 课文:
+      - 第 1 章 · 你的第一次请求: ch01.md
+      - 第 2 章 · 裸爬：拿到第一批数据: ch02.md
